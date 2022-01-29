@@ -1,0 +1,1291 @@
+---
+title: "Heart Disease Prediction System"
+author: "Chandra Sekhar Polisetti"
+date: "_`r format(Sys.Date(), '%d %B, %Y')`_"
+output:
+  pdf_document:
+    df_print: kable
+    number_sections: yes
+    toc: yes
+    fig_caption: yes
+    includes:
+      in_header: preamble.tex
+  html_document: default
+fontsize: 11pt
+include-before: '`\newpage{}`{=latex}'
+urlcolor: blue
+---
+
+```{r setup, include=FALSE}
+# Install Required packages
+
+if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
+if(!require(ggplot2)) install.packages("ggplot2", repos = "http://cran.us.r-project.org")
+if(!require(ggthemes)) install.packages("ggthemes", repos = "http://cran.us.r-project.org")
+if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
+if(!require(knitr)) install.packages("knitr", repos = "http://cran.us.r-project.org")
+if(!require(kableExtra)) install.packages("kableExtra", repos = "http://cran.us.r-project.org")
+if(!require(rpart)) install.packages("rpart", repos = "http://cran.us.r-project.org")
+if(!require(randomForest)) install.packages("randomForest", repos = "http://cran.us.r-project.org")
+
+# Open required package libraries
+library(tidyverse)
+library(ggplot2)
+library(ggthemes)
+library(caret)
+library(knitr)
+library(kableExtra)
+library(rpart)
+library(randomForest)
+rafalib::mypar()
+
+
+# Run knitr chunk options 
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE,
+                      fig.align="center", out.width="70%")
+# Create plot theme to apply to ggplot2 element text throughout report
+plot_theme <- theme(plot.caption = element_text(size = 12, face = "italic"), axis.title = element_text(size = 12))
+
+# Ingore Warning During the program
+oldw <- getOption("warn")
+options(warn = -1)
+
+```
+
+\newpage
+
+# **Introduction**
+
+
+As per  Centers for Disease Control and Prevention (CDC), in 2018 30.3 million U.S. adults were diagnosed with heart disease. Every year, about 647,000 Americans die from heart disease, making it the leading cause of death in the United States.   
+  
+  
+Heart disease causes 1 out of every 4 deaths.
+  
+  
+Due to the limitations of the medical resources and high cost of medical services quality diagnosis is un anviable to many and an effective heart disease prediction system is much needed.  
+  
+  
+An effective Heart Disease Prediction System to predict the presence of Heart Disease helps in diagnosing the heart disease and there by providing the right treatment to the patients on time.  
+
+
+This project presents you the steps involved in building an effective Heart Disease Prediction Model.   
+
+# **Overview**
+
+Predicting whether the patient is Healthy ( No heart disease) or Unhealthy ( has heart disease) with an effective machine learning Model is the goal of this project.  
+
+We will build few machine learning algorithms and pick the algorithm that performs better and meets the sensitivity and specificity expectations.  
+
+We start with downloading and cleaning the data, followed by analysis of the data given taken from the UCI machine learning repository.   
+
+Predicting the presence of heart disease by classifying the output as Unhealthy or Healthy is a Classification problem. Based on the characteristics of the data few machine learning algorithms which classifies the output are used to predict the heart disease.  
+
+All the algorithm performances would be analyzed and presented in the results section, moreover we also recommended algorithms based on the sensitivity and specificity expectations.  
+
+Here is the High level process followed to build the machine learning model, and is also the outline of this report, each step will be dealt with great detail in the subsequent sections  
+  
+  
+  1. Data Preparation - Data Preparation, Cleanup and Wrangling.  
+          
+          
+  2. Analysis - Analyze the data to gain insights into the data.  
+  
+  
+  3. Methods - Various machine learning algorithms would used to predict heart disease   
+  
+          
+  4. Results - Results of various algorithms used would be discussed  
+  
+  
+  5. Conclusion - Conclude the report with limitations and future work
+  
+  
+  
+\newpage
+# **Data Preparation**
+
+Data Preparation downloads and wrangles the data to facilitate the data analysis. Primary focus would be to download, clean the data.
+
+## Data Download 
+
+Heart disease dataset is downloaded form the UCI machine learning repository and here is the path to the repository, http://archive.ics.uci.edu/ml/machine-learning-databases/heart-disease/processed.cleveland.data.
+
+Note that there are 3 other unprocessed datasets in the UCI machine learning repository which were not considered. We have taken the processed cleaveland dataset for this project.
+
+## Data Cleanup
+
+```{r data-download, warning=FALSE, message=FALSE , echo=FALSE}
+
+# Download and clean data
+url <- "http://archive.ics.uci.edu/ml/machine-learning-databases/heart-disease/processed.cleveland.data"
+heart_disease_ds <- read.csv(url, header=FALSE)
+```
+
+Lets look at the dimensions of the dataset
+
+```{r data-cleanup-structure-of-data, warning=FALSE, message=FALSE , echo=FALSE}
+
+dim(heart_disease_ds)
+
+```
+
+As we can see there are 14 dimensions and the total number of rows are 304. Total number of rows , 303, are quite low for the 14 dimensions we have to get a good predicting power. Moreover as the number of dimensions are high certain machine learning algorithms like knn may not be suitable.
+
+
+Let's look at the first 6 rows of the data.
+
+```{r data-structure, warning=FALSE, message=FALSE , echo=FALSE}
+
+head(heart_disease_ds) %>%
+  kable(
+        caption = "First 6 rows of data from heart disease dataset",
+        align = "lrr", booktabs = TRUE, format = "latex", linesep = "") %>%
+  kable_styling(full_width = FALSE, position = "center", latex_options = "hold_position")
+
+```
+
+As we can see that there are no column names so let's fix the column names and re look at the data.
+
+```{r data-cleanup-fix-columns, warning=FALSE, message=FALSE , echo=FALSE}
+
+colnames(heart_disease_ds) <- c(
+  "age",
+  "sex",# 0 = female, 1 = male
+  "cp", # chest pain
+  # 1 = typical angina,
+  # 2 = atypical angina,
+  # 3 = non-anginal pain,
+  # 4 = asymptomatic
+  "restbps", # resting blood pressure (in mm Hg)
+  "chol", # serum cholestoral in mg/dl
+  "fbs",  # fasting blood sugar if less than 120 mg/dl, 1 = TRUE, 0 = FALSE
+  "restecg", # resting electrocardiographic results
+  # 1 = normal
+  # 2 = having ST-T wave abnormality
+  # 3 = showing probable or definite left ventricular hypertrophy
+  "thalach", # maximum heart rate achieved
+  "exang",   # exercise induced angina, 1 = yes, 0 = no
+  "oldpeak", # ST depression induced by exercise relative to rest
+  "slope", # the slope of the peak exercise ST segment
+  # 1 = upsloping
+  # 2 = flat
+  # 3 = downsloping
+  "ca", # number of major vessels (0-3) colored by fluoroscopy
+  "thal", # this is short of thalium heart scan
+  # 3 = normal (no cold spots)
+  # 6 = fixed defect (cold spots during rest and exercise)
+  # 7 = reversible defect (when cold spots only appear during exercise)
+  "hd" # (the predicted attribute) - diagnosis of heart disease
+  # 0 if less than or equal to 50% diameter narrowing
+  # 1 if greater than 50% diameter narrowing
+)
+
+head(heart_disease_ds) %>%
+  kable(
+        caption = "First 6 rows of heart disease dataset",
+        align = "lrr", booktabs = TRUE, format = "latex", linesep = "") %>%
+  kable_styling(full_width = FALSE, position = "center", latex_options = "hold_position")
+
+```
+
+\newpage
+Lets look at the structure of the dataset
+
+```{r data-cleanup-struct-of-data, warning=FALSE, message=FALSE , echo=FALSE}
+
+str(heart_disease_ds)
+
+```
+
+
+Based on the above data we need to make the below changes to the data structure
+
+  * Sex column has values 0 and 1 to represent female and male patients, for better readability lets mark them as $F$ for female and $M$ for male values.
+  * There are missing values in ca and thal, we need to convert them into NA's first and later we will discuss on what to do with the values.
+  * cp, fbs, restecg , exang , slop needs to be converted into factors
+  * hd values has 0 represent healthy heart with no heart disease , and 1 ,2 and 3 values represent unhealthy heart. As our main goal is to predict the presence of heart disease, hd $0$ values would be converted into as $Healthy$ and hd values $1,2 \space or\space 3$ as $Unhealthy$.
+  
+Now after all the above changes here is the modified data structure of the dataset
+  
+```{r data-cleanup-convert-char-to-factors, warning=FALSE, message=FALSE , echo=FALSE}
+
+# Mark male and female as M and F for better readablity
+heart_disease_ds[heart_disease_ds$sex == 0,]$sex <- "F"
+heart_disease_ds[heart_disease_ds$sex == 1,]$sex <- "M"
+
+# replace missing values with NA
+heart_disease_ds[heart_disease_ds == "?"] <- NA
+
+# Convert the columns which have factors to factor
+
+heart_disease_ds$sex <- as.factor(heart_disease_ds$sex)
+heart_disease_ds$cp <- as.factor(heart_disease_ds$cp)
+heart_disease_ds$fbs <- as.factor(heart_disease_ds$fbs)
+heart_disease_ds$restecg <- as.factor(heart_disease_ds$restecg)
+heart_disease_ds$exang <- as.factor(heart_disease_ds$exang)
+heart_disease_ds$slope <- as.factor(heart_disease_ds$slope)
+
+# Since ca and thal have ?, R converts the values as level's of string values, but as they are integer values lets convert them to integers and then convert to factor.
+heart_disease_ds$ca <- as.integer(heart_disease_ds$ca) 
+heart_disease_ds$ca <- as.factor(heart_disease_ds$ca)
+heart_disease_ds$thal <- as.integer(heart_disease_ds$thal) # "thal" also had "?"s in it.
+heart_disease_ds$thal <- as.factor(heart_disease_ds$thal)
+
+## This next line replaces 0 and 1 with "Healthy" and "Unhealthy"
+heart_disease_ds$hd <- ifelse(test=heart_disease_ds$hd == 0, yes="Healthy", no="Unhealthy")
+heart_disease_ds$hd <- as.factor(heart_disease_ds$hd) 
+
+# Now after all the above changes lets look at the data
+str(heart_disease_ds)
+
+```
+
+
+Now that the data structure has been cleaned up to facilitate the analysis, lets work on the missing values.
+
+
+
+```{r data-cleanup-find-missing-values, warning=FALSE, message=FALSE , echo=FALSE}
+
+
+rows_with_missing_values <- sum(is.na(heart_disease_ds))
+total_rows <- nrow(heart_disease_ds)
+missing_value_row_percent <- (rows_with_missing_values/total_rows) * 100
+
+```
+
+There are `r rows_with_missing_values ` rows with missing values, and there are `r total_rows ` number of rows in the dataset so the percentage of missing values in the dataset is `r missing_value_row_percent `. As this percent is very low we are ignoring the missing values.
+
+
+```{r data-cleanup-remove-missing-values, warning=FALSE, message=FALSE , echo=FALSE}
+
+heart_disease_ds <- heart_disease_ds[!(is.na(heart_disease_ds$ca) | is.na(heart_disease_ds$thal)),]
+
+```
+
+
+# **Analysis **
+
+Now that the data is cleaned up and the missing values have been deleted we are ready for data analysis.
+
+This section would mainly analyze data by looking at each of the independent variables.  
+
+
+## Heart Disease dataset fetures
+
+Here is a quick look at dataset and its sample data  
+  
+
+Dimensions of the dataset
+
+```{r movie-rating-dataset-dimensions, warning=FALSE, message=FALSE , echo=FALSE}
+dim(heart_disease_ds)
+```
+
+Here is some sample data
+
+```{r heart_disease-dataset-sample data, warning=FALSE, message=FALSE ,echo=FALSE}
+head(heart_disease_ds) %>%
+  kable(
+        caption = "First 6 rows of data from heart disease dataset",
+        align = "lrr", booktabs = TRUE, format = "latex", linesep = "") %>%
+  kable_styling(full_width = FALSE, position = "center", latex_options = "hold_position")
+```
+\newpage
+As we can see from the above , each row is a particular patients metrics, namely   age,sex,cp,restbps,chol,fbs,restecg,exang,oldpeak,slop,ca,thal, and their associated 
+heart disease condition such as Healthy or  Unhealthy.
+
+
+Lets look at individual attributes and how the the values are distributed to see the variability
+
+## Heart Disease Distribution
+
+Lets look at how the presence of heart disease in the dataset
+
+```{r - heart_disease_distribution, fig.cap="Heart Disease Distribution"}
+# Plot Heart Disease by Sex
+heart_disease_ds$hd <- heart_disease_ds$hd %>% factor(levels = c("Unhealthy","Healthy"))
+heart_disease_ds %>% 
+  ggplot(aes(hd) ) + geom_bar(aes(colour = hd) ) + plot_theme
+```
+\newpage
+
+Prevalence of heart disease is `r mean(heart_disease_ds$hd)`.
+
+## Heart Disease by Sex
+
+Lets look at how Sex values are distributed among Healthy and Unhealthy categories
+
+```{r - heart_disease_by_sex, fig.cap="Heart Disease by Sex"}
+# Plot Heart Disease by Sex
+heart_disease_ds %>% 
+  ggplot(aes(hd) ) + 
+  geom_bar(aes(fill = hd) ) + 
+  facet_grid( ~ sex) + 
+  plot_theme
+```
+
+```{r heart_disease_hd_by_sex_category_counts, warning=FALSE, message=FALSE}
+xtabs(~ hd + sex, data=heart_disease_ds) %>%
+  kable(
+        caption = "Heart Disease by Sex ",
+        align = "lrr", booktabs = TRUE, format = "latex", linesep = "") %>%
+  kable_styling(full_width = FALSE, position = "center", latex_options = "hold_position")
+```
+
+Lets look at the prevalence of Heart disease by gender.
+
+```{r - heart_disease_prevalence, fig.cap="Heart Disease prevalence"}
+# Plot Heart Disease by Sex
+heart_disease_ds %>% group_by(sex) %>% summarize( prevelance = mean(hd == "Unhealthy")) %>%
+  kable(
+        caption = "Heart Disease Prevelence By Gender",
+        align = "lrr", booktabs = TRUE, format = "latex", linesep = "") %>%
+  kable_styling(full_width = FALSE, position = "center", latex_options = "hold_position")
+
+prv <- heart_disease_ds %>% group_by(sex) %>% summarize( prevelance = mean(hd == "Unhealthy"))
+
+```
+
+This dataset was taken from patients in Cleveland, USA . 
+
+As we can see from the above the prevalence of heart disease in men is `r prv[2,]$prevelance` and women is `r prv[1,]$prevelance`.  \
+The prevalence of heart disease given in the CDC website for USA is 0.223 in Women and 0.244 for Men, by these numbers Women prevalence seems to be close enough with the dataset, but for Men, prevalence is way off with CDC prevalence, one reason for this could be that the CDC data was based on the general public and is not from the patients who have had heart symptoms and might not be from the heart hospitals, as the data from Cleveland dataset was taken from patients from cardiologists, meaning these patients had symptions to start with and various tests were performed, this high prevalence for Men in the data set might not be an issue, this could be verified by looking at the data from cdc website but it is out of scope for this project.
+
+
+## Heart Disease by Chest Pain
+
+Lets look at cp, chest pain, and see how the values are distributed among Healthy and Unhealthy categories.
+
+```{r heart_disease_hd_by_cp, fig.cap="Heart Disease by Chest Pain"}
+heart_disease_ds %>% 
+  ggplot(aes(hd) ) + 
+  geom_bar(aes(fill = hd) ) + 
+  facet_grid( ~ cp) + 
+  xlab("Heart Disease") +
+  plot_theme
+```
+
+```{r heart_disease_hd_by_cp_category_counts, warning=FALSE, message=FALSE}
+xtabs(~ hd + cp, data=heart_disease_ds) %>%
+  kable(
+        caption = "Heart Disease by Chest Pain Categories",
+        align = "lrr", booktabs = TRUE, format = "latex", linesep = "") %>%
+  kable_styling(full_width = FALSE, position = "center", latex_options = "hold_position")
+```
+
+As we can see from the above the proportion of Unhealthy patients varies across cp categories, and we could make use of these variation while predicting the Heart Disease. 
+
+## Heart Disease by Fasting Blood Sugar
+
+Lets look at fbs, fasting blood sugar, and see how the values are distributed among Healthy and Unhealthy categories.
+
+```{r heart_disease_hd_by_fbs, fig.cap="Heart Disease by Fasting Blood Sugar"}
+heart_disease_ds %>% 
+  ggplot(aes(hd) ) + 
+  geom_bar(aes(fill = hd) ) + 
+  facet_grid( ~ fbs) + 
+  xlab("Heart Disease") +
+  plot_theme
+```
+
+```{r heart_disease_hd_by_fbs_category_counts, warning=FALSE, message=FALSE ,echo=FALSE}
+xtabs(~ hd + fbs, data=heart_disease_ds) %>%
+  kable(
+        caption = "Heart Disease by Fasting Blood Sugar",
+        align = "lrr", booktabs = TRUE, format = "latex", linesep = "") %>%
+  kable_styling(full_width = FALSE, position = "center", latex_options = "hold_position")
+```
+
+\newpage
+As we can see from the above the proportion of Unhealthy patients varies across fbs categories, and we could make use of these variation while predicting the Heart Disease. 
+
+## Heart Disease by Resting Electro Cardiographic Results
+Lets move on to the next column, restecg, resting electro cardiographic results, and see how the values are distributed among Healthy and Unhealthy categories.
+
+```{r heart_disease_hd_by_restecg, fig.cap="Heart Disease by Resting Electro Cardiographic Results"}
+heart_disease_ds %>% 
+  ggplot(aes(hd) ) + 
+  geom_bar(aes(fill = hd) ) + 
+  facet_grid( ~ restecg) + 
+  xlab("Heart Disease") +
+  plot_theme
+```
+
+```{r heart_disease_hd_by_restecg_fig_counts, warning=FALSE, message=FALSE ,echo=FALSE}
+xtabs(~ hd + restecg, data=heart_disease_ds) %>%
+  kable(
+        caption = "Heart Disease by Resting Electro Cardiographic Results",
+        align = "lrr", booktabs = TRUE, format = "latex", linesep = "") %>%
+  kable_styling(full_width = FALSE, position = "center", latex_options = "hold_position")
+```
+
+\newpage
+As we can see from the above the proportion of Unhealthy patients varies across restecg categories, and we could make use of these variation while predicting the Heart Disease. Note that restecg category 1 values have very few values ( 1 and 3) for Healthy and Unhealthy categories and these values could adversely impact the result due to the low values so we need to handle this in the methods section.
+
+## Heart Disease by Exercise Induced Angina
+
+Lets look at exang, exercise induced angina, and see how the values are distributed among Healthy and Unhealthy categories.
+
+```{r heart_disease_hd_by_exang_fig, fig.cap="Heart Disease by Exercise Induced Angina"}
+heart_disease_ds %>% 
+  ggplot(aes(hd) ) + 
+  geom_bar(aes(fill = hd) ) + 
+  facet_grid( ~ exang) + 
+  xlab("Heart Disease") +
+  plot_theme
+```
+
+```{r heart_disease_hd_by_exang_fig_counts, warning=FALSE, message=FALSE ,echo=FALSE}
+xtabs(~ hd + exang, data=heart_disease_ds) %>%
+  kable(
+        caption = "Heart Disease by Exercise Induced Angina",
+        align = "lrr", booktabs = TRUE, format = "latex", linesep = "") %>%
+  kable_styling(full_width = FALSE, position = "center", latex_options = "hold_position")
+```
+\newpage
+As we can see from the above the proportion of Unhealthy patients varies across exang categories, and we could make use of these variation while predicting the Heart Disease.
+
+## Heart Disease by Slope
+
+Lets look at slope, the slope of the peak exercise ST segment, and see how the values are distributed among Healthy and Unhealthy categories.
+
+```{r heart_disease_hd_by_slope_fig, fig.cap="Heart Disease by Slope"}
+heart_disease_ds %>% 
+  ggplot(aes(hd) ) + 
+  geom_bar(aes(fill = hd) ) + 
+  facet_grid( ~ slope) + 
+  xlab("Heart Disease") +
+  plot_theme
+```
+
+
+```{r heart_disease_hd_by_slope_counts, warning=FALSE, message=FALSE ,echo=FALSE}
+xtabs(~ hd + slope, data=heart_disease_ds) %>%
+  kable(
+        caption = "Heart Disease by Slope",
+        align = "lrr", booktabs = TRUE, format = "latex", linesep = "") %>%
+  kable_styling(full_width = FALSE, position = "center", latex_options = "hold_position")
+```
+
+As we can see from the above the proportion of Unhealthy patients varies across slope categories, and we could make use of these variation while predicting the Heart Disease.
+
+## Heart Disease by Number of major vessels (0-3) colored by fluoroscopy
+
+Lets look at ca, number of major vessels (0-3) colored by fluoroscopy, and see how the values are distributed among Healthy and Unhealthy categories.
+
+```{r heart_disease_hd_by_ca_fig, fig.cap="Heart Disease by Number of major vessels (0-3) colored by fluoroscopy"}
+heart_disease_ds %>% 
+  ggplot(aes(hd) ) + 
+  geom_bar(aes(fill = hd) ) + 
+  facet_grid( ~ ca) + 
+  xlab("Heart Disease") +
+  plot_theme
+```
+
+
+```{r heart_disease_by_ca_counts, warning=FALSE, message=FALSE ,echo=FALSE}
+xtabs(~ hd + ca, data=heart_disease_ds) %>%
+  kable(
+        caption = "Heart Disease by Number of major vessels (0-3) colored by fluoroscopy",
+        align = "lrr", booktabs = TRUE, format = "latex", linesep = "") %>%
+  kable_styling(full_width = FALSE, position = "center", latex_options = "hold_position")
+```
+
+As we can see from the above the proportion of Unhealthy patients varies across $ca$ categories, and we could make use of these variation while predicting the Heart Disease. Note that there are few values for ca category 2 and 3 for Healthy heart category.
+
+\newpage
+
+## Heart Disease by Thalium heart scan
+
+Lets move on to the next column, thal, thalium heart scan, and see how the values are distributed among Healthy and Unhealthy categories.
+
+```{r heart_disease_hd_by_thal_fig, fig.cap="Heart Disease by Thalium heart scan"}
+heart_disease_ds %>% 
+  ggplot(aes(hd) ) + 
+  geom_bar(aes(fill = hd) ) + 
+  facet_grid( ~ thal) + 
+  xlab("Heart Disease") +
+  plot_theme
+```
+
+
+```{r heart_disease_by_thal_counts, warning=FALSE, message=FALSE ,echo=FALSE}
+xtabs(~ hd + thal, data=heart_disease_ds) %>%
+  kable(
+        caption = "Heart Disease by Thalium heart scan",
+        align = "lrr", booktabs = TRUE, format = "latex", linesep = "") %>%
+  kable_styling(full_width = FALSE, position = "center", latex_options = "hold_position")
+```
+
+As we can see from the above the proportion of Unhealthy patients varies across $thal$ categories, and we could make use of these variation while predicting the Heart Disease. Note that there are few values for thal category 6 under the Healthy heart category.
+
+As we are done with variables of type factor, lets move on to the variables with numerical data and analyze the data.
+
+## Heart Disease vs Resting Blood Pressure
+
+Lets look at how resting blood pressure effects Heart Disease
+
+```{r heart_disease_hd_by_resting_bp, fig.cap="Heart Disease vs Blood Pressure"}
+heart_disease_ds %>% mutate( y = ifelse(hd=="Healthy", 0, 1)) %>%
+  ggplot(aes(restbps,y)) + 
+  geom_smooth(method = "loess")
+```
+
+\newpage
+As we can see from the above, lower resting blood pressure is associated with $Healthy$ and the higher the blood pressure readings are associated with the $Unhealthy$. We can clearly see a trend between resting blood pressure and the heart disease.We could make use of this variable in predicting the heart disease.
+
+## Heart Disease vs Serum Cholestoral
+
+Lets look at how serum cholesterol effects Heart Disease
+
+```{r heart_disease_hd_by_chol, fig.cap="Heart Disease vs Serum Cholestoral"}
+heart_disease_ds %>% mutate( y = ifelse(hd=="Healthy", 0, 1)) %>%
+  ggplot(aes(chol,y)) + 
+  geom_smooth(method = "loess")
+```
+\newpage
+As we can see from the above figure, there is a moderate effect of serum cholesterol on the heart disease.We can make use of this variable in predicting the heart disease.
+
+## Heart Disease vs Maximum Heart Rate Achieved
+
+Lets look at how maximum heart rate achieved effects Heart Disease
+
+```{r heart_disease_hd_by_thalach, fig.cap="Heart Disease vs Maximum Heart Rate Achieved"}
+heart_disease_ds %>% mutate( y = ifelse(hd=="Healthy", 0, 1)) %>%
+  ggplot(aes(thalach,y)) + 
+  geom_smooth(method = "loess")
+```
+\newpage
+As we can see from the above figure, lower values of maximum heart rate achieved (< 150) are associated with heart disease than the higher values.We can make use of this variable in predicting the heart disease.
+
+## Heart Disease vs ST depression induced by exercise relative to rest
+
+Lets look at how ST depression induced by exercise relative to rest effects Heart Disease
+
+```{r heart_disease_hd_by_st, fig.cap="ST depression induced by exercise relative to rest"}
+heart_disease_ds %>% mutate( y = ifelse(hd=="Healthy", 0, 1)) %>%
+  ggplot(aes(oldpeak,y)) + 
+  geom_smooth(method = "loess")
+```
+\newpage
+As we can see from the above figure, higher values of ST depression induced by exercise relative to rest are associated with heart disease than the lower values.We can make use of this variable in predicting the heart disease.
+
+
+## Heart Disease vs Age
+
+Lets look at how age effects Heart Disease
+
+```{r heart_disease_hd_by_age, fig.cap="Heart Disease vs Age"}
+heart_disease_ds %>% mutate( y = ifelse(hd=="Healthy", 0, 1)) %>%
+  ggplot(aes(age,y)) + 
+  geom_smooth(method = "loess")
+```
+\newpage
+As we can see from the above figure, there is a clear trend between age and heart disease, presence of heart disease is apparent in patients between 50 and 70 years old. We can make use of this variable in predicting the heart disease.
+
+
+Summary of the analysis is that we have seen changes in proportion of Unhealthy values across categories for all of the factor variables, and for the numerical variables have shown the trend associated with the heart disease.
+
+Variable importance and its contribution to the prediction power would become clear in the Methods section.
+
+As we are now done with the analysis of the independent variables, let jump on to the methods section to build various algorithms and see which algorithm fits the best for predicting the heart disease presence.
+
+
+\newpage
+#  **Methods**
+
+In this section the primary focus would be on predicting the heart disease using various machine learning algorithms and choose the one which performs better. 
+
+The following is the high level outline of this section, each step would be detailed out in the subsequent sections.
+
+  1) Package Installation & Loading
+  2) Data Partition for Training & Testing
+  3) Algorithm evaluation criteria
+  4) Model 1 - Novice Heart Disease Model
+  5) Model 2 - Logistic Regression Heart Disease Model
+  6) Model 3 - KNN Heart Disease Model
+  7) Model 4 - Classification Tree Heart Disease Model
+  8) Model 5 - Random Forest Heart Disease Model
+  9) Model 6 - Ensemble Model
+  
+  
+
+## Data Partition for Training & Testing
+
+Before we start building the algorithms we need to split the data for training and testing the algorithm.
+
+Training data will only be used for training and optimizing the algorithm and the testing data will be exclusively used for testing the optimized algorithm.
+
+
+Following are the steps that are performed for data partitioning 
+
+  1) 20% of the data rows from the heart disease dataset (heart_disease_ds) are randomly selected and placed in test_set  dataset, and this will be kept aside for performing the validation of each Heart Disease Prediction Model we build in the subsequent sections. This dataset will not be used for training and optimizing the model. This dataset is not used for training mainly to avoid over fitting the data.
+  2) The remaining 80% of the data rows from the heart disease dataset are brought into the train_set dataset.This dataset is mainly used for training and optimizing each of the algorithms we build.
+
+```{r heart_disease_ds-partitioning, warning=FALSE, message=FALSE , echo=FALSE}
+
+# Partition dataset into test_set and train_set
+set.seed(1, sample.kind="Rounding") # if using R 3.5 or earlier, use `set.seed(1)`
+test_index <- createDataPartition(y = heart_disease_ds$hd, times = 1, p = 0.2, list = FALSE)
+train_set <- heart_disease_ds[-test_index,]
+test_set <- heart_disease_ds[test_index,]
+```
+
+  
+  After all the above steps the following datasets would be obtained
+  
+  1) train_set - This dataset has `r nrow(train_set)` records and this will be primarily used for training and optimizing the machine learning algorithms.
+  2) test_set - This dataset has `r nrow(test_set)` and this will only be used to get the final predictions for each algorithm.
+  
+\newpage
+## Algorithm Evaluation
+
+As we are dealing with a classification problem we will be using sensitivity , specificity and accuracy to evaluate the performance of the algorithms.
+
+The high level process we follow for Training & Optimization, and Validation is listed below,
+
+  * We use cross validation with 10 folds on train_set,to train and optimize the algorithm.
+  * We take the parameters that optimized the algorithm from the above step and use them to re-train the algorithm using the entire train_set. Retraining the algorithm with optimized parameters will make sure that the algorithm is exposed to the entire train_set. 
+  * The retrained model in the above step is used to validate the data in test_test.
+  * Algorithm accuracy,sensitivity and specificity values are published in the respective sections but a detailed analysis will be performed in the Results section.
+
+
+## Model 1 - Novice Heart Disease Model
+
+Before getting into various machine learning models, lets work on a rudimentary model which predicts the presence of heart disease using the prevalence of the heart disease in the dataset.
+
+Here is the model we are using.
+
+$$
+p(\mathbf{x}) = \mbox{Pr}(Y="Unhealthy" \mid \mathbf{X}=\mathbf{x})  = p("Unhealthy") = 0.4599156
+$$
+
+In the above formula we are using the prevalence of heart disease in the train_set as the probability of predicting the patient as Unhealthy, we are not making use of any of the predictors for this model. We have taken the prevalence from train_set to avoid over-fitting.
+
+Lets see how this has performed by looking at the confusion matrix.
+
+```{r model1-Novice Model, warning=FALSE, message=FALSE , echo=FALSE}
+
+# Calculate the prevelance of heart disease in the dataset and assing it as p
+p <- mean(train_set$hd == "Unhealthy")
+# Use prevelance of heart disease in the dataset and predict the presence of heart disease
+set.seed(2008)
+y_hat_guessing <- sample( c("Healthy","Unhealthy"),length(test_set$hd),
+                        replace = TRUE, prob = c(1-p,p)) %>% 
+                      factor(levels = levels(test_set$hd))
+# Confusion matrix to evaluate the performance
+cm <- confusionMatrix(y_hat_guessing, test_set$hd, positive = "Unhealthy")
+cm$table
+cm$byClass
+# Store the results of this algorithm to compare this algorithm against other algorithms
+guess_results <- data.frame(method ="Model 1 - Guessing",
+                          accuracy = cm$overall[["Accuracy"]],
+                          Sensitivity=cm$byClass[["Sensitivity"]],
+                          Specificity=cm$byClass[["Specificity"]],
+                          F1 = cm$byClass[["F1"]]
+) 
+```
+
+As seen from the above results, overall accuracy of the algorithm is `r cm$overall[["Accuracy"]]`, where as the sensitivity is `r cm$byClass[["Sensitivity"]]`, that is `r cm$byClass[["Sensitivity"]]*100` percent of patients who are Unhealthy will be predicted as Unhealthy, and its specificity is `r cm$byClass[["Specificity"]] `, that is `r cm$byClass[["Specificity"]] *100` percent of patients who are Healthy will be predicted as Healthy.
+
+The above metrics are same as flipping a coin, and we can take this as the baseline and try to beat this algorithm.
+
+
+## Model 2 - Logistic Regression Heart Disease Model
+
+The next simple model to the Novice Model is linear model, and moreover linear models are easy to interpret and often taken as a baseline model before getting into the complex models. 
+
+Lets build a linear model to predict the heart disease.
+
+Logistic Regression is the linear model which is used for Classification problems and lets build this model for Heart Disease Prediction.
+
+Our goal in building a machine learning model is to estimate the below conditional probability for any given value of x. That is the probability of a patient being Unhealthy given X = x, in our case X is a multi-dimensional vector with all the independent variables in the heart disease dataset, and X = x is one row of this vector.
+
+$$
+\mbox{Pr}( Y = "Unhealthy" \mid X = x)
+$$
+Logistic regression fits the the below linear model to find out the expected value of the above probability assuming a linear relationship between the Y and the independent variables.
+
+$$ 
+g\left\{ \mbox{Pr}(Y = "Unhealthy" \mid X=x) \right\} = \beta_0 + \beta_1 x
+$$
+Linear coefficients are fitted with the train_set data. 
+
+Here the logistic transformation g(p) is given below 
+
+$$ g(p) = \log \frac{p}{1-p}$$
+
+### Train Model
+
+Lets fit the logistic regression model using cross validation with 10 folds and look at the fitted model.
+
+```{r model1-logistic_regression_fit, warning=FALSE, message=FALSE , echo=FALSE}
+###############################################################################
+# Logistic Regression
+###############################################################################
+
+# Lets do Cross Validation get the expected value of the accuracy
+
+fit_logit = train(
+  form = hd ~ .,
+  data = train_set,
+  trControl = trainControl(method = "cv", number = 10),
+  method = "glm",
+  family = "binomial"
+)
+```
+
+Maximum likelihood is used to fit the linear model. The coefficients of the fitted model are given below. 
+Note that the coefficients are in log(odds of Unhealthy heart).
+
+```{r model1-logistic_regression_fit_summary, warning=FALSE, message=FALSE , echo=FALSE}
+summary(fit_logit)
+```
+
+Here is the final fitted model using the logistic regression
+
+$$ 
+g\left\{ \mbox{Pr}(Y = "Unhealthy" \mid X=x) \right\} = 7.270703 + 0.018455 age -1.883959 sexM - 1.454022 cp2 -0.625054 cp3
+$$
+$$
+-2.467096 cp4 -0.028672 restbps -0.008014  chol + 0.533154 fbs1 -0.568488 restecg1 -0.201334 restecg2 
+$$
+$$
++ 0.019768 thalach -0.617129 exang1  -0.233478 oldpeak -1.295017 slope2 -1.329498 slope3 -2.365343 ca1 
+$$
+$$
+-3.145813 ca2 -2.560277 ca3 + 0.452021 thal6 + -0.865555 thal7        
+$$
+As the results of the fit is a random variable we used cross validation to get the expected values of the accuracy. In logistic regression there are no parameters to the model and hence we used cross validation to get the expected value of the accuracy. Here are the accuracy values we got in various folds of the cross validation.
+
+```{r model1-logistic_regression_fit_resample, warning=FALSE, message=FALSE , echo=FALSE}
+fit_logit$resample %>%
+  kable(
+        caption = "Accuracy of the fit in various folds during cross validation",
+        align = "lrr", booktabs = TRUE, format = "latex", linesep = "") %>%
+  kable_styling(full_width = FALSE, position = "center", latex_options = "hold_position")
+```
+\newpage
+Estimated accuracy of the model is `r fit_logit$results$Accuracy`. This is same as the mean accuracy of all the folds in the
+cross validation table as shown above.
+
+As we have seen the estimated performance of the model, we can refit the model with the entire train_set so that the model will get more data to train on, as we have only used partial data to fit the model during the cross validation. 
+
+Lets refit the model with the train_set and look at McFadden's Pseudo R Squared, see below for the formula , this would give us an estimate of the R Squared, by which we can check what percent of the variance in the output is explained by the Logistic Regression Model.
+
+$$McFadden's Pseudo R^2 = [ LL(Null) - LL(Proposed) ] / LL(Null)$$
+Here LL(Null) is the log likelihood of the Null model and LL(Proposed) is the log likelihood of the logistic regression model.
+
+```{r model1-logistic_regression_refit_and_r2, warning=FALSE, message=FALSE , echo=FALSE}
+
+
+# Refit the model with all the data before predicting the results
+set.seed(2009)
+fit_logit_final <- glm(hd ~ ., family = "binomial", data = train_set)
+
+## Now calculate the overall "Pseudo R-squared" and its p-value
+ll.null <- fit_logit_final$null.deviance/-2
+ll.proposed <- fit_logit_final$deviance/-2
+
+## McFadden's Pseudo R^2 = [ LL(Null) - LL(Proposed) ] / LL(Null)
+pseudo_r2 <- (ll.null - ll.proposed) / ll.null
+
+## The p-value for the R^2
+p_value <- 1 - pchisq(2*(ll.proposed - ll.null), df=(length(fit_logit_final$coefficients)-1))
+
+```
+
+$McFadden's Pseudo R^2$ value by using the above formula is `r pseudo_r2` and $p\_value$ is `r p_value`.
+The fitted model explains the `r pseudo_r2*100` percent of the variance in the output and the $p\_value$ `r p_value` tell us that the R Squared value is statistically significant.
+
+### Validate  Model
+
+Lets validate our model by predicting the presence of heart disease in the test_test and look at the results
+
+```{r model1-logistic_regression_predict, warning=FALSE, message=FALSE , echo=FALSE}
+
+# Predict the presence of heart disease in the test data
+p_hat_logit <- predict(fit_logit_final, newdata = test_set , type = "response")
+y_hat_logit <- ifelse(p_hat_logit > 0.5, "Healthy", "Unhealthy") %>% factor ( levels = c("Unhealthy","Healthy"))
+
+# Confusion Matrix
+cm <- confusionMatrix(y_hat_logit, test_set$hd)
+cm
+# Store the results of this algorithm to compare this algorithm against other algorithms
+logit_results <- data.frame(method ="Model 2 - Logistic Regression",
+                           accuracy = cm$overall[["Accuracy"]],
+                           Sensitivity=cm$byClass[["Sensitivity"]],
+                            Specificity=cm$byClass[["Specificity"]],
+                            F1 = cm$byClass[["F1"]]
+                           ) 
+
+results_df <- rbind(guess_results,logit_results)
+
+```
+
+As seen from the above results, overall accuracy of the algorithm is `r cm$overall[["Accuracy"]]`, where as the sensitivity is `r cm$byClass[["Sensitivity"]]`, that is `r cm$byClass[["Sensitivity"]]*100` percent of patients who are Unhealthy will be predicted as Unhealthy, and its specificity is `r cm$byClass[["Specificity"]] `, that is `r cm$byClass[["Specificity"]] *100` percent of patients who are Healthy will be predicted as Healthy.
+
+ Here is the compasion of Logistic Regression model with the Novice model
+
+```{r model1-logistic_results_Comparison_1, warning=FALSE, message=FALSE , echo=FALSE}
+
+  results_df %>%
+  kable(
+        caption = "Model Comparison Table",
+        align = "lrr", booktabs = TRUE, format = "latex", linesep = "") %>%
+  kable_styling(full_width = FALSE, position = "center", latex_options = "hold_position")
+```
+
+There metrics are far better than the Novice model.
+
+Lets build few more models and see whether the accuracy improves.
+
+## Model 3 - KNN Heart Disease Model
+
+Lets build KNN (k nearest neighbors) model and see whether the accuracy improves. In knn we estimate the below conditional probabilities 
+
+$$
+p(x_1, x_2) = \mbox{Pr}(Y=1 \mid X_1=x_1 , X_2 = x_2).
+$$
+First we define the distance between all observations based on the features. Then, for any point $(x_1,x_2)$ for which we want an estimate of $p(x_1, x_2)$, we look for the $k$ nearest points to $(x_1,x_2)$ and then take an average of the Unhealthy and Healthy outputs associated with these points.
+
+To implement the algorithm, we can use the `knn3` function from the __caret__ package. 
+
+### Train & Optimize
+
+Lets train the knn model on the train_set using 10 fold cross validation and k values `r seq(5,200,3)` for tuning.
+
+```{r model3_knn_fit, warning=FALSE, message=FALSE , echo=FALSE}
+
+fit_knn = train(
+  hd ~ .,
+  data = train_set,
+  method = "knn",
+  trControl = trainControl(method = "cv", number = 10),
+  tuneGrid = expand.grid(k = seq(5, 200, by = 2))
+)
+
+max_index <- which.max(fit_knn$results$Accuracy)
+best_k <- fit_knn$results$k[max_index]
+best_acc <- fit_knn$results$Accuracy[max_index]
+
+
+```
+
+Here is the accuracy of the knn model vs k-values graph from cross validation
+
+```{r model3_knn_fit_k_vs_accuracy, warning=FALSE, message=FALSE , echo=FALSE}
+
+plot(fit_knn)
+
+```
+
+From the above figure we can see that the k-value that performed better in the cross validation is `r best_k` and its accuracy is `r best_acc`. 
+
+### Validate Model
+
+Lets refit the knn model on the train_set with the optimal k-value obtained in the above step, k = `r best_k`, as it will give the model an opportunity to train on the entire train_set, and use the model to validate the model on the validation dataset (test_set).
+
+```{r model3_knn_fit_knn_refit_and_validation, warning=FALSE, message=FALSE , echo=FALSE}
+# Refit the model using the entire train_set
+set.seed(2008)
+final_knn_fit <- knn3(hd ~ ., data = train_set, k = best_k)
+# Predict the output using the fitted model
+y_hat <- predict(final_knn_fit, newdata = test_set, type = "class")
+# Confusion Matrix
+cm <- confusionMatrix(y_hat, test_set$hd, positive = "Unhealthy")
+# Results
+knn_results <- data.frame(method ="Model 3 - KNN",
+                            accuracy = cm$overall[["Accuracy"]],
+                            Sensitivity=cm$byClass[["Sensitivity"]],
+                            Specificity=cm$byClass[["Specificity"]],
+                            F1 = cm$byClass[["F1"]]
+) 
+
+results_df <- rbind(results_df,knn_results)
+```
+
+Here are the confusion matrix results after validation.
+
+```{r model3_knn_validation_cm, warning=FALSE, message=FALSE , echo=FALSE}
+
+cm
+
+```
+
+As seen from the above results, overall accuracy of the algorithm is `r cm$overall[["Accuracy"]]`, where as the sensitivity is `r cm$byClass[["Sensitivity"]]`, that is `r cm$byClass[["Sensitivity"]]*100` percent of patients who are Unhealthy will be predicted as Unhealthy, and its specificity is `r cm$byClass[["Specificity"]] `, that is `r cm$byClass[["Specificity"]] *100` percent of patients who are Healthy will be predicted as Healthy.
+
+Here is the KNN Model comparison with other models
+
+```{r results_Comparison_2, warning=FALSE, message=FALSE , echo=FALSE}
+
+  results_df %>%
+  kable(
+        caption = "Model Comparison Table",
+        align = "lrr", booktabs = TRUE, format = "latex", linesep = "") %>%
+  kable_styling(full_width = FALSE, position = "center", latex_options = "hold_position")
+```
+
+
+Here is the summary of the KNN Validation Results
+
+  * This accuracy is slightly better than the Novice model 
+  * Sensitivity of Novice models better than KNN
+  * Logistic regression model is way better than KNN in accuracy, sensitivity and specificity.
+
+Poor performance of the KNN model in our case is due to large of number of dimensions.
+
+Lets look at couple more models and see whether we could beat the logistic regression. 
+
+Note that we can not perform LDA and QDA on this dataset as the some of the variable are factors and LDA and QDA works on numerical data and when multinational distribution is assumed.
+
+## Model 4 - Classification Tree Heart Disease Model
+
+Classification trees, or decision trees, are used in prediction problems where the outcome is categorical so we will use Classification trees to predict the heart disease.
+
+In Classification Tree Model we estimate the below conditional probabilities by which class is the most common among the training set observations within the partition
+
+$$
+p(x_1, x_2) = \mbox{Pr}(Y="Unhealthy" \mid X).
+$$
+
+
+We are going to use CART package in R to train the algorithm, and CART uses _Gini Index_ to choose the partition, here is the definition of the Gini Index.
+
+$$
+\mbox{Gini}(j) = \sum_{k=1}^K \hat{p}_{j,k}(1-\hat{p}_{j,k})
+$$
+In a perfect scenario, the outcomes in each of our partitions are all of the same category since this will permit perfect accuracy. The _Gini Index_ is going to be 0 in this scenario, and become larger the more we deviate from this scenario. The partitions that produce minimum _Gini Index_ would be chosen.
+
+### Train & Optimize Model
+
+Lets train and optimize Heart Disease Classification Model using cross validation with 10 folds and use _complexity parameter_ (cp) as tuning parameter with values `r seq(0.0, 0.1, len = 25)`. Lets keep the mtry at default value which is the square root of number of parameters, and minsplit at 0 so that the algorithm gets the flexibility during training.
+
+```{r model3_rpart_training_cv, warning=FALSE, message=FALSE , echo=FALSE}
+
+fit_rpart <- train(hd ~ .,
+                     method = "rpart",
+                     tuneGrid = data.frame(cp = seq(0.0, 0.1, len = 25)),
+                     control = rpart.control(minsplit = 0),
+                     data = train_set)
+
+ind <- which.max(fit_rpart$results$Accuracy)
+best_cp <- fit_rpart$results$cp[ind]
+best_acc <- fit_rpart$results$Accuracy[ind]
+
+```
+
+Here is the performance of the Heart Disease Classification Tree for various values of Complexity Parameter
+
+```{r heart_disease_rpart_train_plot, fig.cap="Results of Cross Valtion"}
+plot(fit_rpart)
+```
+
+As we can see from the above graph the best value of Complexity Parameter (cp) is `r best_cp` which has got an accuracy of `r best_acc` during training.
+
+### Validate Model
+
+As we got the parameters that optimized the model lets retrain the algorithm using the optimal parameters obtained during the above cross training on the entire train_set. Here is the Heart Disease classification tree after the retraining on the entire train_set,
+
+```{r heart_disease_rpart_refit, fig.cap="Heart Disease Classfication Tree"}
+fit_rpart <- rpart(hd ~ ., data = train_set, 
+             control = rpart.control(cp = best_cp, minsplit = 0))
+plot(fit_rpart, margin = 0.1)
+text(fit_rpart, cex = 0.75)
+```
+
+Here is the variable importance based on the fit
+
+```{r model3_rpart_variable_importance, warning=FALSE, message=FALSE , echo=FALSE}
+fit_rpart$variable.importance
+```
+
+Lets use the trained model and predict the Heart Disease outcome.
+
+Here is the Confusion Matrix based on the predicted outcomes.
+
+```{r model3_rpart_predict_heart_disease, warning=FALSE, message=FALSE , echo=FALSE}
+
+y_hat_rpart <- predict(fit_rpart, test_set,type = "class")
+cm <- confusionMatrix(y_hat_rpart, test_set$hd)
+cm
+
+# Store Results
+rpart_results <- data.frame(method ="Model 4 - Classification Trees",
+                            accuracy = cm$overall[["Accuracy"]],
+                            Sensitivity=cm$byClass[["Sensitivity"]],
+                            Specificity=cm$byClass[["Specificity"]],
+                            F1 = cm$byClass[["F1"]]
+) 
+
+results_df <- rbind(results_df,rpart_results)
+```
+
+As seen from the above results, overall accuracy of the algorithm is `r cm$overall[["Accuracy"]]`, where as the sensitivity is `r cm$byClass[["Sensitivity"]]`, that is `r cm$byClass[["Sensitivity"]]*100` percent of patients who are Unhealthy will be predicted as Unhealthy, and its specificity is `r cm$byClass[["Specificity"]] `, that is `r cm$byClass[["Specificity"]] *100` percent of patients who are Healthy will be predicted as Healthy.
+
+Here is the model Comparison table
+
+```{r model1-logistic_results_Comparison_3, warning=FALSE, message=FALSE , echo=FALSE}
+
+  results_df %>%
+  kable(
+        caption = "Model Comparison Table",
+        align = "lrr", booktabs = TRUE, format = "latex", linesep = "") %>%
+  kable_styling(full_width = FALSE, position = "center", latex_options = "hold_position")
+```
+
+
+As we see from the above Classification Tree Model has the height specificity across all built so far ,  but the sensitivity is still less than the Logistic Regression Model.
+
+As we know that Random Forest improves the performance of the Classification trees by building large number of random trees. Lets build Random Forest Model in the next section.
+
+
+## Model 5 - Random Forest Heart Disease Model
+
+Random forests are a **very popular** machine learning approach that addresses the shortcomings of decision trees using a clever idea. The goal is to improve prediction performance and reduce instability by _averaging_ multiple decision trees (a forest of trees constructed with randomness). Lets use Random Forest to model Heart Disease predictions.
+
+### Train & Optimize Model
+
+Lets train and optimize Random Forest Heart Disease Model using cross validation with 10 folds and use the following turning parameters,
+
+     1) mtry:  `r 1:10`
+     
+     2) nodesize: `r seq(1, 51, 10)` 
+
+Here are the results of the cross validation
+
+```{r model3_rf_training_cv, warning=FALSE, message=FALSE , echo=FALSE}
+set.seed(2009)
+nodesize <- seq(1, 51, 10)
+acc <- map_df(nodesize, function(ns){
+  fit <- train(hd ~ ., method = "rf", data = train_set,
+        tuneGrid = data.frame(mtry = 1:10),
+        nodesize = ns)
+  ind <- which.max(fit$results$Accuracy)
+  best_mtry <- fit$results$mtry[ind]
+  best_acc <- fit$results$Accuracy[ind]
+  list(nodesize = ns, mtry =best_mtry, accuracy = best_acc)
+  
+})
+
+acc  %>%
+  kable(
+        caption = "Accuracy of the fit for various values of mtr and nodesize",
+        align = "lrr", booktabs = TRUE, format = "latex", linesep = "") %>%
+  kable_styling(full_width = FALSE, position = "center", latex_options = "hold_position")
+
+ind <- which.max(acc$accuracy)
+best_mtry <- acc$mtry[ind]
+best_nodesize <- acc$nodesize[ind]
+best_acc <- acc$accuracy[ind]
+
+
+```
+
+Above table shows the best nodesize and mtry in each fold of the cross validation along with thier accuracy.
+
+We can see that optimal values for which the max accuracy has achieved, that is `r best_acc` , are mtry = `r best_mtry` and nodesize = `r best_nodesize`.
+
+Here is a plot of the accuracy when we set the optimal nodesize, `r best_nodesize`, and fit the model with various values of mtry, and it clearly shows that the maximum accuracy achived when mtry = `r best_mtry`.
+
+```{r model3_rf_fit_graph, warning=FALSE, message=FALSE , echo=FALSE}
+fit <-       train(hd ~ .,
+                  method = "rf", 
+                  nodesize = best_nodesize,
+                  tuneGrid = data.frame(mtry = 1:10),
+                  data = train_set)
+
+ggplot(fit)
+```
+
+### Validate Model
+
+We need to retrain the algorithm on the train_set using the parameters that optimized the model in the previous section so that the model is exposed to the entire train_set. 
+
+Here is the Confusion Matrix from the predictions of the test_set by using the Random Forest Heart Disease Model
+
+```{r model3_rf_predictions, warning=FALSE, message=FALSE , echo=FALSE}
+# Retrain the model with the optimal parameters
+set.seed(2009)
+train_rf <- randomForest(hd ~ ., data=train_set, nodesize = best_nodesize , mtry = best_mtry)
+# Predict the outcome
+y_hat_rf_opt <- predict(train_rf, test_set)
+# Confusion Matrix 
+cm <- confusionMatrix(y_hat_rf_opt, test_set$hd)
+
+cm
+
+rf_results <- data.frame(method ="Model 5 - Random Forest",
+                            accuracy = cm$overall[["Accuracy"]],
+                            Sensitivity=cm$byClass[["Sensitivity"]],
+                            Specificity=cm$byClass[["Specificity"]],
+                            F1 = cm$byClass[["F1"]]
+) 
+
+results_df <- rbind(results_df,rf_results)
+```
+\newpage
+As seen from the above results, overall accuracy of the algorithm is `r cm$overall[["Accuracy"]]`, where as the sensitivity is `r cm$byClass[["Sensitivity"]]`, that is `r cm$byClass[["Sensitivity"]]*100` percent of patients who are Unhealthy will be predicted as Unhealthy, and its specificity is `r cm$byClass[["Specificity"]] `, that is `r cm$byClass[["Specificity"]] *100` percent of patients who are Healthy will be predicted as Healthy.
+
+
+Here is the Random Forest Model comparison with other models.
+
+```{r model1-logistic_results_Comparison_4, warning=FALSE, message=FALSE , echo=FALSE}
+
+  results_df %>%
+  kable(
+        caption = "Model Comparison Table",
+        align = "lrr", booktabs = TRUE, format = "latex", linesep = "") %>%
+  kable_styling(full_width = FALSE, position = "center", latex_options = "hold_position")
+```
+
+As we see from the above Random Forest Model has performed better than Classification Trees ,  but the sensitivity is still less than the Logistic Regression Model.
+
+
+## Model 6 - Ensemble Model
+
+Lets combine the models we have already built in the previous sections to build an Ensemble Model which could improve the overall performance of the predictions.
+
+The approach that we follow to select the models for Ensemble Model is as follows
+ 
+  * Calculate the Training Performance of all the models that we built so far except the Novice Model
+  * Calculate the combined average of the all the model
+  * Select the models that performed greater than or equal to the combined average
+
+See below for their training accuracy of individual models and their combined average
+
+```{r ensembles_analysis, warning=FALSE, message=FALSE , echo=FALSE}
+y_hat_logit_train <- ifelse(fit_logit_final$fitted.values > 0.5, "Healthy", "Unhealthy") %>% factor ( levels = c("Unhealthy","Healthy"))
+cm_train_logit <- confusionMatrix(y_hat_logit_train,train_set$hd)
+logit_acc <- cm_train_logit$overall["Accuracy"]
+y_hat_knn_train <- predict(final_knn_fit, newdata = train_set, type = "class")
+cm_train_knn <- confusionMatrix(y_hat_knn_train,train_set$hd)
+knn_acc <- cm_train_knn$overall["Accuracy"]
+y_hat_rpart_train <- predict(fit_rpart, train_set , type = "class")
+cm_rpart_rpart <- confusionMatrix(y_hat_rpart_train, train_set$hd)
+rpart_acc <- cm_rpart_rpart$overall["Accuracy"]
+y_hat_rf_train <- predict( train_rf, train_set , type = "class")
+cm_rf_train <- confusionMatrix(y_hat_rf_train, train_set$hd)
+rf_acc <- cm_rf_train$overall["Accuracy"]
+
+average <- mean(logit_acc,knn_acc,rpart_acc,rf_acc)
+
+```
+
+Logistic Regression Heart Disease Model Training Accuracy : `r logit_acc`
+
+KNN Heart Disease Model Training Accuracy                 : `r knn_acc`
+
+Heart Disease Classification Tree Model Training Accuracy : `r rpart_acc`
+
+Random Forest Heart Disease Model Training Accuracy       : `r rf_acc`
+
+Combined Accuracy of all the above Models                     : `r average`
+
+We see that Logistic Regression and Random Forest Models only have their Training Accuracy greater than or equal to the combined accuracy, so we can consider combining these models to improve the accuracy of the predictions. 
+
+Here is the approach we take for predicting the outcome
+
+ * For every row in test_set, set the Random Forest vote to 1 if Random Forest predicts the outcome as "Unhealthy" otherwise 0.   
+ * For every row in test_set, set the Logistic Regression vote to 1 if Logistic Regression predicts the outcome as "Unhealthy" otherwise 0.
+ * For every row in the test_set, calculate the average vote, by taking the average of Random Forest vote and the Logistic Regression vote
+ * If the average vote > 0.5 then predict the outcome as "Unhealthy" otherwise "Healthy"
+
+Here are the results of the prediction after combining Logistic Regression Heart Disease Model and Random Forest Heart Disease Models
+
+```{r ensembles_with_logit_and_rf, warning=FALSE, message=FALSE , echo=FALSE}
+logit_votes_for_unhealthy <- ifelse(y_hat_logit == "Unhealthy",1,0)
+rf_votes_for_unhealthy <- ifelse(y_hat_rf_opt == "Unhealthy",1,0)
+my_list <- list(logit = logit_votes_for_unhealthy , rf = rf_votes_for_unhealthy)
+model_predictions_df <- as_tibble(my_list)
+votes <- rowMeans(model_predictions_df)
+y_hat <- ifelse(votes > 0.5, "Unhealthy", "Healthy") %>% factor(levels=c("Unhealthy","Healthy"))
+mean(y_hat == test_set$hd)
+cm <- confusionMatrix(y_hat,test_set$hd)
+cm
+ensembles_results <- data.frame(method ="Model 6 - Ensemble Model",
+                            accuracy = cm$overall[["Accuracy"]],
+                            Sensitivity=cm$byClass[["Sensitivity"]],
+                            Specificity=cm$byClass[["Specificity"]],
+                            F1 = cm$byClass[["F1"]]
+) 
+
+results_df <- rbind(results_df,ensembles_results)
+```
+
+As seen from the above results, overall accuracy of the algorithm is `r cm$overall[["Accuracy"]]`, where as the sensitivity is `r cm$byClass[["Sensitivity"]]`, that is `r cm$byClass[["Sensitivity"]]*100` percent of patients who are Unhealthy will be predicted as Unhealthy, and its specificity is `r cm$byClass[["Specificity"]] `, that is `r cm$byClass[["Specificity"]] *100` percent of patients who are Healthy will be predicted as Healthy.
+
+
+Here is the Ensemble Model comparison with other models.
+
+```{r results_Comparison_5, warning=FALSE, message=FALSE , echo=FALSE}
+
+  results_df %>%
+  kable(
+        caption = "Model Comparison Table",
+        align = "lrr", booktabs = TRUE, format = "latex", linesep = "") %>%
+  kable_styling(full_width = FALSE, position = "center", latex_options = "hold_position")
+```
+
+\newpage
+
+As we see from the above Ensemble Model has the height accuracy and specificity across all the models but the sensitivity is still less than the Logistic Regression Model
+
+
+#  **Results**
+
+Now that we have completed building the Models for Hear Disease Prediction System, lets look at all Model performances and analyze the results.
+
+Here is the table which summarizes the performance of all the models
+
+```{r results_Comparison_6, warning=FALSE, message=FALSE , echo=FALSE}
+
+  results_df %>%
+  kable(
+        caption = "Model Comparison Table",
+        align = "lrr", booktabs = TRUE, format = "latex", linesep = "") %>%
+  kable_styling(full_width = FALSE, position = "center", latex_options = "hold_position")
+
+# Reset the warnings to normal
+options(warn = oldw)
+
+```
+
+
+We started with Model 1 - Guessing as a novice model which has not considered any of the independent variables, and this model is only use to give us a base line estimate. This models accuracy and specificity are same as flipping a coin, sensitivity is little high, that is `r results_df[1,]$Sensitivity` is due to prevalence of the Heart Disease.
+
+Model 2 - Logistic Regression has second height accuracy after Model 6 - Ensemble Model, and height sensitivity among all the models, that is `r results_df[2,]$Sensitivity`. But this model's specificity, which is `r results_df[2,]$Specificity`, is `r results_df[6,]$Specificity-results_df[2,]$Specificity` less than the model with the highest specificity. As it is a linear model it is simple and easy to interpret. This model could be chosen to predict the Heart Disease if sensitivity is more important than specificity, that is predicting the patient with Heart Disease as Heart Disease is more important than predicting the patient who is Healthy as Healthy by taking a little compromise in specificity. Slight compromise in sensitivity would slightly increase the chance of predicting Unhealthy patients as Healthy, and this incorrect diagnosis could put a patient in danger, where as a slight compromise in specificity would slightly increase the chance of predicting the patient who is Healthy as Unhealthy and in which case the patient's incorrect diagnosis adverse impact is less. Based on the above argument we could recommend Logistic Regression when sensitivity is more important than the specificity while predicting the Heart Disease.
+
+Model 3 - KNN Models accuracy and specificity are higher than the Novice Model but sensitivity is less than the Novice Model. Sensitivity of this model is `r results_df[3,]$Sensitivity`, this sensitivity is not even close to flipping a coin and hence this model would not be recommended for predicting the Heart Disease. Poor performance of this model is due the the number of dimensions, the total number of dimensions after hot encoding, that is by adding the dummy variables for each of the categories, is 20, these are high number of dimensions, and due to the curse of dimensional, that is if you want to inclue $10\%$ of the data in a neighborhood in a 20 dimensional space, then each dimension space would have to be  `r 0.8912509*100`, that is around 90% of each dimension is taken away for just 10% of the data, and hence the neighborhood is no longer local and hence the poor performance.
+
+Model 4 - Classification Trees Model accuracy, `r results_df[4,]$accuracy` , is better than Novice and KNN models, but still less than the logistic regression model, specificity is `r results_df[4,]$Specificity` , and is better than Logistic Regression Model but not better than the Ensemble Model. Its sensitivity, `r results_df[4,]$Sensitivity` is `r results_df[2,]$Sensitivity-results_df[4,]$Sensitivity` less than the Logistic Regression Model. The main advantage of this model is its interpretation, very easy to interpret and even so that the logistic regression model. As there is a significant difference in the sensitivity with the best model and moreover this model's variance would be high as it would most frequently get over-fitted with the training data, we would not recommend this for the prediction. However we could use this models variable importance to understand how individual variables contribution to the output.
+
+Model 5 - Random Forest Model accuracy, `r results_df[5,]$accuracy` , is better than Novice and KNN models, and same as the logistic regression model, specificity is `r results_df[5,]$Specificity` is better than Logistic Regression Model but not better than the Ensemble Model. Its specificity is `r results_df[5,]$Sensitivity-results_df[4,]$Sensitivity` more than the Logistic Regression Model which put this model at advantage if specificity is more than sensitivity. Due to the randomness introduced during the training from random selection of variables during model fitting and the random samples from bootstrapping reduces the variance in the predictions.Its main drawback of this model is that we lose the model interpretation.
+
+Model 6 - Ensemble Model accuracy, `r results_df[6,]$accuracy` , is higer than Novice, KNN , logistic regression model and Classification Trees models. Its specificity, `r results_df[5,]$Specificity` is higher than all other models, and in specific it is `r results_df[6,]$Sensitivity-results_df[4,]$Sensitivity` more than the Logistic Regression Model which put this model at advantage if specificity is more than sensitivity. The main downside of the model is loss of interpretation due to the average of all the models.
+
+In summary we could choose Model 2 - Logistic Regression if sensitivity is more important than the specificity. If specificity and overall accuracy is more important than sensitivity we could choose the Model 6 - Ensemble Model as it has got higher values of both accuracy and specificity.
+
+#  **Conclusion**
+
+We have started the project with data download and clean up, and later used data visualization to present the analysis of all the independent variables and gained insights into their effects on the output. We built various machine learning models to predict whether the patient has Heart Disease in Methods section and compared all the models in the Results section and in the same section we discussed individual models pro's and con's, and recommended $Model \space 2 - Logistic Regression$ if sensitivity is more important than the specificity, and if specificity and overall accuracy is more important than sensitivity we can recommended $Model\space 6 - Ensemble \space Model$. The goal of this project has been achieved.
+
+The following are the limitations of the model,
+  
+  1) Size of the input data set is only 303 rows and hence the algorithm's might not had enough exposure to the real world data
+  
+  2) As noted in the analysis section under Heart Disease Distribution sub section, prevalence of Heart Disease in Men in the dataset is significantly more than the CDC heart disease prevalence and this could impact the predictions.
+  
+Following are the future considerations for the Heart Disease Prediction System
+
+  * There are 3 more dataset are present in the UCI machine learning repository for 3 other counties and those datasets needs to be analyzed and combined incorporated in the algorithm to improve the prediction power.
+  
+  * As per CDC Race or Ethnicity seems to play a role in Heart Disease but this variable is not present in the processed dataset we have taken so if this information is available consider including it in the algorithms. This is one of many factors which could explain the presence of Heart Disease so need more data exploration to find out other factors which are missing in the dataset and include them if data is available.
+  
+  * There are around 2 percent of the data has missing values, that is 6 rows, and they were removed as the percent of missing values are low, but to improve the performance we could employ missing value imputation techniques such as random forest to impute the values.
+  
+  * The best algorithm that gave us the better sensitivity is Logistic Regression, and R Sqaured for this model is 0.5172917, which is only around half of the variance in the output and the remaining variance is still unexplained so we could do a better job on the predictions by trying other algorithms.
+  
+  * Deep learning algorithms and other machine learning algorithms needs to be considered in futher improving the sensitivity and specificity of the predicted outcome.
