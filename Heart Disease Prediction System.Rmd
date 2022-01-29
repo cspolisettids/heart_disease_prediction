@@ -77,7 +77,50 @@ Predicting whether the patient is Healthy ( No heart disease) or Unhealthy ( has
 
 We will build few machine learning algorithms and pick the algorithm that performs better and meets the sensitivity and specificity expectations.  
 
-We start with downloading and cleaning the data, followed by analysis of the data given taken from the UCI machine learning repository.   
+We start with downloading the heart disease data from UCI machine learning repository , and cleaning the data, followed by analysis, methods , results and conclusion.
+
+Here is the dataset information used in this project
+
+ * Source - UCI Machine Learning Repository
+ * Data Set Characteristics - Multivariate
+ * Attribute Characteristics - Categorical, Integer, Real
+ * Associated Tasks - Classification
+ * Number of Instances - 303
+ * Number of Attributes - 14
+ * Missing Values? - Yes
+ * Area - Life
+
+The following are the variables of the dataset
+
+  * age - Age of the patient
+  * sex - Gender of the patient, 0 = female, 1 = male
+  * cp - Chest Pain
+    * 1 = typical angina
+    * 2 = atypical angina
+    * 3 = non-anginal pain
+    * 4 = asymptomatic
+  * restbps - Resting blood pressure (in mm Hg)
+  * chol - Serum cholestoral in mg/dl
+  * fbs - Fasting blood sugar if less than 120 mg/dl, 1 = TRUE, 0 = FALSE
+  * restecg - Resting electrocardiographic results
+    * 1 = normal
+    * 2 = having ST-T wave abnormality
+    * 3 = showing probable or definite left ventricular hypertrophy
+  * thalach - Maximum heart rate achieved
+  * exang - Exercise induced angina, 1 = yes, 0 = no
+  * oldpeak - ST depression induced by exercise relative to rest
+  * slope - The slope of the peak exercise ST segment
+    * 1 = upsloping
+    * 2 = flat
+    * 3 = downsloping
+  * ca - Number of major vessels (0-3) colored by fluoroscopy
+  * thal - This is short of thalium heart scan
+    * 3 = normal (no cold spots)
+    * 6 = fixed defect (cold spots during rest and exercise)
+    * 7 = reversible defect (when cold spots only appear during exercise)
+  * hd - The predicted attribute - diagnosis of heart disease
+    * 0 if less than or equal to 50% diameter narrowing
+    * 1 if greater than 50% diameter narrowing
 
 Predicting the presence of heart disease by classifying the output as Unhealthy or Healthy is a Classification problem. Based on the characteristics of the data few machine learning algorithms which classifies the output are used to predict the heart disease.  
 
